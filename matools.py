@@ -322,7 +322,7 @@ def get_model_ml_(params):
     
   return clf
 
-#
+### function to assist parallel implementation
 def f(params, X, Y):
 
   print ('rodando params: {}'.format(params))
@@ -509,7 +509,7 @@ def part_feature_study(feature, df_a, y_name, pathfile=None):
   else:
     type_var = 'Cont'
     nbins = 4
-    x = np.linspace(0,100,nbins+1)
+    x = np.linspace(0, 100, nbins+1)
     percentis = np.percentile(df_a[feature], x) # nbins + 1 comeca no zero
 
     hist, edges = np.histogram(df_a[feature].values, bins=percentis)
@@ -518,7 +518,9 @@ def part_feature_study(feature, df_a, y_name, pathfile=None):
     
     for i in range(nbins):
       feature_subgroup.append( np.logical_and((df_a[feature] > edges[i]) , (df_a[feature] < edges[i+1])) )
-    
+
+  # criando uma figura para todos plots    
+  plt.figure(figsize=(15,8))
 
   for i, partial_feat in enumerate(feature_subgroup):
 
@@ -528,18 +530,32 @@ def part_feature_study(feature, df_a, y_name, pathfile=None):
     elif type_var == 'Cont':
       df_b = df_a[partial_feat]
 
+
+    #
+    Y = df_b[y_name].values
+    df_x = df_b.drop(columns=y_name)
+    X = df_x.values
+
     df_b = df_b.drop(columns=feature)
+    # 
+        
+    clf = RandomForestClassifier(n_estimators=40)
+    if (Y==1).sum()>10:
+      auc_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multiclass=False).auc.mean()
+    else:
+      auc_ = 'na'
+    #
 
     # correlacao com o y
     plt.clf()
-    plt.figure(figsize=(15,8))
+    #plt.figure(figsize=(15,8))
     corr_ = df_b.corr()[y_name].values
     x = range(len(corr_))
     plt.plot(x, corr_, 'o--')
     plt.plot([0, x[-1]], [0, 0], '-')
     plt.xticks(x, list(df_b.corr()[y_name].index), rotation=75)
-    plt.tight_layout()
-    plt.title('quant. dados: {}'.format(len(df_b)))
+    #plt.tight_layout()
+    plt.title('AUC RF: {:.3} / quant. dados: {} / quant. ocorr {}:'.format(auc_, len(df_b), (Y==1).sum()))
     if pathfile:
       if type_var == 'Cat':
         plt.savefig(pathfile+'/'+feature+'_'+str(partial_feat)+'_'+'corr_with'+y_name+'.png', dpi=120)
@@ -547,8 +563,6 @@ def part_feature_study(feature, df_a, y_name, pathfile=None):
         plt.savefig(pathfile+'/'+feature+'_'+str(edges[i])+'_'+str(edges[i+1])+'_'+'corr_with'+y_name+'.png', dpi=120)
     else:
       plt.show()
-
-    plt.clf()
 
 
 def rfe(X, Y, pathfile=None, labels=[]):
@@ -798,6 +812,10 @@ def rfe_cv(X, Y, cv=3, pathfile=None, labels=[]):
   else:
     print (s)
 
+
+
+
+
 def tchart(features, values, title=None, pathfile=None):
   num_features = len(features)
   pos = np.arange(num_features) + .5    # bars centered on the y axis
@@ -818,6 +836,11 @@ def tchart(features, values, title=None, pathfile=None):
   else:
     plt.show()
 
+
+
+
+
+
 def checknamefolder(folder):
   fileName = Path(folder)
 
@@ -835,6 +858,11 @@ def checknamefolder(folder):
   else:
       return folder
 
+
+
+
+
+
 def gerar_hists(df, fig_folder):
   for variable in df.columns:
     print ('Histograma '+variable)
@@ -848,6 +876,11 @@ def gerar_hists(df, fig_folder):
       plt.show()
     plt.cla()
     plt.close(fig)
+
+
+
+
+
     
 def rfc_model_report(X, Y, write_folder=None, cv=4, balanced=True, labels=[], augmented=None):
 
