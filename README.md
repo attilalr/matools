@@ -1,2 +1,2 @@
 # matools
-My tools do data analysis
+My tools to do data analysis
