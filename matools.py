@@ -1128,4 +1128,43 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
 
 
 
+def eliminate_cols_nan(df, thr):
+ 
+  # thr entre 0 e 1
+  n_records = df.shape[0]
+  
+  if thr <= 1 and thr >= 0:
+    n_nans_max = int(n_records * thr)
+  else:
+    n_nans_max = int(thr)
+  
+  feats_to_delete = list()
+
+  for col in df.columns:
+    try:
+      if np.isnan(df[col]).sum() > n_nans_max:
+        feats_to_delete.append(col)
+    except:
+      print ('Erro na col '+str(col)+'. Coluna ignorada.')
+
+  df = df.drop(columns=feats_to_delete)
+
+  return df, feats_to_delete
+
+###  
+def eliminate_records_nan(df, thr):
+ 
+  # thr entre 0 e 1
+  n_feat = df.shape[1]
+
+  if thr <= 1 and thr >= 0:
+    n_feat_max = int(n_feat * thr)
+  else:
+    n_feat_max = int(thr)
+
+  records_to_delete = (np.isnan(df).sum(axis=1)>n_feat_max).to_numpy().nonzero()[0]
+
+  df = df.drop(records_to_delete)
+
+  return df, records_to_delete
 
