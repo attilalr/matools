@@ -90,6 +90,7 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multic
 
   # laco dos folds
   cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(42))
 
   scores_f1 = list()
   scores_precision = list()
@@ -177,7 +178,8 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
     print ('Erro! flag multiclass.')
 
   # laco dos folds
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  #cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(42))
 
   Y_pred_proba_geral = np.zeros(shape=Y.shape)
   Y_pred_geral = np.zeros(shape=Y.shape)
@@ -225,18 +227,7 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
 
       print ('parametro {} de {}'.format(k, len(params_list)))
 
-
-      if params.split()[0] == 'svc':
-        clf = svm.SVC(C=float(params.split()[1]), gamma=float(params.split()[2]), kernel=svc_kernel, probability=True)
-      elif params.split()[0] == 'rfc':
-        if params.split()[1].lower()  == 'none':
-          clf = RandomForestClassifier(n_estimators=100, max_depth=None)
-        else:        
-          clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]))
-      elif params.split()[0] == 'logit':
-          clf = LogisticRegression(penalty='l2', solver='lbfgs', multi_class='multinomial', C=params.split()[1])
-      else:
-        print ('Nao foi identificado o classificador. {}'.format(params))
+      clf = get_model_ml_(params)
       
       return_ = cros_val(clf, X[train], Y[train], metrics=['accuracy', 'recall'], smote=True, cv=3, multiclass=multiclass)
       params_scores[k] = return_.auc.mean()
@@ -246,6 +237,7 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
     best_params = params_list[params_scores.argmax()]
     best_params_idx = params_scores.argmax()
     
+    clf = get_model_ml_(best_params)
 
     if writefolder:
       s = s + '####### FOLD {} of {} #####\n'.format(i+1, cv)
@@ -327,7 +319,7 @@ def get_model_ml_(params):
   return clf
 
 ### function to assist parallel implementation
-def f(params, X, Y):
+def f(params, X, Y, cv):
 
   print ('rodando params: {}'.format(params))
 
@@ -340,7 +332,7 @@ def f(params, X, Y):
   else:
     print ('Erro! flag multiclass.')
 
-  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multiclass=multiclass)
+  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=cv, multiclass=multiclass)
 
   return return_.auc.mean()
 
@@ -364,11 +356,13 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
 
   # laco dos folds
   cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(42))
 
   Y_pred_proba_geral = np.zeros(shape=Y.shape)
   Y_pred_geral = np.zeros(shape=Y.shape)
 
 
+  '''
   # SVC
   C_list = np.logspace(np.log10(0.1), np.log10(4000), num=10)
   C_list = [str(x) for x in C_list]
@@ -394,9 +388,29 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   C_list = np.logspace(np.log10(0.001), np.log10(200), num=80)
   C_list = [str(x) for x in C_list]
   logit_params_list = ['logit '+' '+x for x in C_list]
-
-  params_list = svc_params_list + rfc_params_list + logit_params_list + ada_params_list
+  '''
   
+  # SVC
+  C_list = np.logspace(np.log10(1), np.log10(1000), num=6)
+  C_list = [str(x) for x in C_list]
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=6)
+  gamma_list = [str(x) for x in gamma_list]
+
+  svc_kernel = 'rbf'
+  svc_params_list = list(itertools.product(C_list, gamma_list))
+  svc_params_list = ['svc '+' '.join(x) for x in svc_params_list]
+  
+  # RF
+  max_depth_list = ['2', '4', '8', 'None']
+  rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
+
+  # Logit
+  C_list = np.logspace(np.log10(0.001), np.log10(4), num=10)
+  C_list = [str(x) for x in C_list]
+  logit_params_list = ['logit '+' '+x for x in C_list]
+
+  params_list = svc_params_list + rfc_params_list + logit_params_list
+   
   params_scores = np.zeros((len(params_list),))
   params_std_scores = np.zeros((len(params_list),))
 
@@ -412,7 +426,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
 
-    parameters_vector_total = [(x, X[train], Y[train]) for x in params_list]
+    parameters_vector_total = [(x, X[train], Y[train], cv) for x in params_list]
 
     params_scores_partial = list()
     for parameters_vector in [parameters_vector_total[j:j+n_jobs] for j in range(0, len(parameters_vector_total), n_jobs)]:
@@ -456,29 +470,6 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
 
       s = s + 'AUC Ev. score: {:.3}\n'.format(auc_)
       s = s + '###########################\n'
-
-    else:
-      print ('####### FOLD {} of {} #####'.format(i+1, cv))
-      for param, score, std in zip(params_list, params_scores, params_std_scores):
-        print ('param: {}, score: {:.3} ({:.3})'.format(param, score, std))  
-      print ('* Best params: {}, idx: {} - score: {:.3}'.format(best_params, best_params_idx, params_scores[best_params_idx]))
-      
-      print ('*** Evaluation phase ***')
-
-      if multiclass:
-        roc_temporario_ = 0
-        for j in range(1, n_classes+1):
-          Y_pred_proba_geral[test] = clf.predict_proba(X[test])[:, j-1] # pegar o proba 1 aqui 
-          roc_temporario_ = roc_temporario_ + roc_auc_score((Y_true==j).astype('int'), Y_pred_proba_geral[test])
-        roc_temporario_ = roc_temporario_ / n_classes
-        auc_ = roc_temporario_
-      else:
-        auc_ = roc_auc_score(Y[test], clf.predict_proba(X[test])[:, 1])
-
-
-      print ('AUC Ev. score: {:.3}'.format(auc_))
-      print ('###########################')
-
 
 
 
