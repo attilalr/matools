@@ -10,6 +10,8 @@ from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import cross_val_predict, StratifiedKFold
 from sklearn.metrics import f1_score, precision_score, recall_score, roc_curve, auc, roc_auc_score
 
+from sklearn.model_selection import train_test_split
+
 from sklearn.linear_model import LogisticRegression
 
 from sklearn.ensemble import AdaBoostClassifier
@@ -32,12 +34,60 @@ from collections import Counter
 
 from pathlib import Path
 
-#from IPython.terminal.embed import InteractiveShellEmbed
-#from IPython.config.loader import Config
+import IPython
+#IPython.embed()
 
 from sklearn.feature_selection import RFECV, RFE
 
 from collections import namedtuple
+
+
+def learning_curve(X, Y, ml_model, filename=None, n=20, perc_list=None, title=None):
+
+  assert hasattr(ml_model, 'predict_proba')
+
+  if perc_list == None:
+    perc_list = np.linspace(0.1,0.99,20)
+
+  auc_std = list()
+  auc_mean = list()
+
+  for p in perc_list:
+    aucs = list()
+    
+    _, X_frac, _, Y_frac = train_test_split(X, Y, test_size=p, random_state=int(time.time()), stratify=Y, shuffle=True)    
+    
+    for i in range(n):
+      X_train, X_test, y_train, y_test = train_test_split(X_frac, Y_frac, test_size=0.35, random_state=int(time.time()), stratify=Y_frac, shuffle=True)
+      
+      ml_model.fit(X_train, y_train)  
+            
+      auc = roc_auc_score(y_test, ml_model.predict_proba(X_test)[:,1]) # prob do 1
+      aucs.append(auc)
+      
+    aucs = np.array(aucs)
+    auc_std.append(aucs.std())
+    auc_mean.append(aucs.mean())
+    
+  auc_std = np.array(auc_std)
+  auc_mean = np.array(auc_mean)
+  
+  #
+  plt.figure(figsize=(12,8))
+  plt.plot(perc_list, auc_mean, label='Auc mean')
+  plt.plot(perc_list, auc_mean+auc_std, label='Auc + sigma')
+  plt.plot(perc_list, auc_mean-auc_std, label='Auc - sigma')
+  plt.xlabel('fracao do conjunto de dados')
+  plt.ylabel('Auc')
+  plt.legend(loc='lower right')
+  if title:
+    plt.title(title)
+
+  if filename:
+    plt.savefig(filename)
+  else:
+    plt.show()  
+
 
 ###
 def eliminate_cols_nan(df, thr):
