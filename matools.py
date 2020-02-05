@@ -45,9 +45,13 @@ from collections import namedtuple
 
 
 from sklearn.model_selection import learning_curve
-from sklearn.model_selection import ShuffleSplit
 # from https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
-def plot_learning_curve(estimator, title, X, y, axes=None, ylim=None, cv=None, n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5)):
+''' Example of use
+scoring = 'f1_weighted'
+modelname = 'Logit'
+plot_learning_curve(clf, modelname+', scoring='+scoring, X, Y, scoring=scoring, axes=None, ylim=None, cv=None, n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5), filename=fig_folder+'/learning_curve_'+modelname+'_scoring_'+scoring+'.png')
+'''
+def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, ylim=None, cv=None, n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5), filename=None):
 
     if axes is None:
         plt.figure(figsize=(10, 5))
@@ -60,6 +64,7 @@ def plot_learning_curve(estimator, title, X, y, axes=None, ylim=None, cv=None, n
 
     train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs,
                        train_sizes=train_sizes,
+                       scoring=scoring,
                        )
                        
     train_scores_mean = np.mean(train_scores, axis=1)
@@ -81,65 +86,10 @@ def plot_learning_curve(estimator, title, X, y, axes=None, ylim=None, cv=None, n
                  label="Cross-validation score")
     plt.legend(loc="best")
 
-    plt.show()
-
-def learning_curve_binary_classification(X, Y, target, ml_model, scoring='roc_auc', filename=None, n=60, perc_list=None, title=None):
-
-  assert hasattr(ml_model, 'predict_proba')
-  
-  Y = (Y == target).astype('int')
-
-  if perc_list == None:
-    perc_list = np.linspace(0.2,0.90,20)
-
-  auc_std = list()
-  auc_mean = list()
-
-  p_efetivo_list = list()
-
-  for p in perc_list:
-    
-    _, X_frac, _, Y_frac = train_test_split(X, Y, test_size=p, random_state=int(time.time()), stratify=Y, shuffle=True)
-    print ('p:{}, frac:{}'.format(p, Y_frac.size/Y.size))    
-
-    aucs = list()
-    p_efetivo_list.append(Y_frac.size/Y.size)
-    
-    for i in range(n):
-    
-      '''
-      X_train, X_test, y_train, y_test = train_test_split(X_frac, Y_frac, test_size=0.30, random_state=int(time.time()), stratify=Y_frac, shuffle=True)
-      ml_model.fit(X_train, y_train)     
-      auc = roc_auc_score(y_test, ml_model.predict_proba(X_test)[:,1]) # prob do 1
-      '''
-      auc = cross_val_score(ml_model, X_frac, Y_frac, cv=3, scoring='roc_auc').mean()
-      
-      aucs.append(auc)
-      
-    aucs = np.array(aucs)
-    auc_std.append(aucs.std())
-    auc_mean.append(aucs.mean())
-    
-  auc_std = np.array(auc_std)
-  auc_mean = np.array(auc_mean)
-  
-  print (auc_mean, auc_std)
-  
-  #
-  plt.figure(figsize=(12,8))
-  plt.plot(p_efetivo_list, auc_mean, label='Auc mean')
-  plt.plot(p_efetivo_list, auc_mean+auc_std, label='Auc + sigma')
-  plt.plot(p_efetivo_list, auc_mean-auc_std, label='Auc - sigma')
-  plt.xlabel('fracao do conjunto de dados')
-  plt.ylabel('Auc')
-  plt.legend(loc='lower right')
-  if title:
-    plt.title(title)
-
-  if filename:
-    plt.savefig(filename)
-  else:
-    plt.show()  
+    if filename:
+      plt.savefig(filename)
+    else:
+      plt.show()
 
 
 ###
