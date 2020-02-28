@@ -45,6 +45,92 @@ from collections import namedtuple
 
 
 from sklearn.model_selection import learning_curve
+
+
+#
+def univ_scatter(df, features, yname, n=4, writefolder=None):
+
+  for feature in features:
+
+    bins_pos = np.percentile(df[feature].values, np.linspace(0,100,n+1))
+    v_mean = list()
+    v_std = list()
+    
+    if bins_pos.size == np.unique(bins_pos).size: # variavel continua
+      hist, _ = np.histogram(df[feature], bins_pos)
+      xtickslabel = list()
+      bin_pos_label = list()
+      for i in range(bins_pos.size-1): # vou pegar cada intervalo agora e calcular a media de y
+        v = df[(df[feature].values >= bins_pos[i]) & (df[feature].values < bins_pos[i+1])][yname].values
+        xtickslabel.append(str(bins_pos[i])+'-'+str(bins_pos[i+1]))
+        v_mean.append(v.mean())
+        v_std.append(v.std())
+        bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
+
+      v_mean = np.array(v_mean)
+      v_std = np.array(v_std)
+      
+      fig, ax1 = plt.subplots()
+      ax1.set_xlabel(feature)
+      ax1.set_ylabel('mean '+yname)
+      ax1.set_ylim([0,(v_mean+v_std).max()*1.05])
+      ax1.set_xticks(bin_pos_label)
+      #ax1.plot(bins_pos[:-1], v_mean, label='mean '+yname)
+      ax1.plot(bin_pos_label, v_mean, label='mean '+yname)
+      ax1.set_xticklabels(xtickslabel, rotation=35)
+      #ax1.fill_between(bins_pos[:-1], v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
+      ax1.fill_between(bin_pos_label, v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
+      
+      color = 'tab:red'
+      ax2 = ax1.twinx()
+      #ax2.plot(bins_pos[:-1], hist, 'o-', label='bin count', color=color)
+      ax2.plot(bin_pos_label, hist, 'o-', label='bin count', color=color)
+      ax2.set_ylim([0, hist.max()*1.2])
+      ax2.set_ylabel('bin_count', color=color)
+      
+      if writefolder:
+        plt.savefig(writefolder+'/scatter_'+features+'.png')
+      else:      
+        plt.tight_layout()
+        plt.show()
+    else: # variavel categorica
+      bins_pos = np.unique(bins_pos)
+      hist = list()
+      for value in bins_pos:
+        hist.append((df[feature].values==value).sum())
+      #hist, _ = np.histogram(df[feature], bins_pos)
+      for i in range(bins_pos.size): # vou pegar cada intervalo agora e calcular a media de y
+        v = df[df[feature].values == bins_pos[i]][yname].values
+        v_mean.append(v.mean())
+        v_std.append(v.std())
+
+      v_mean = np.array(v_mean)
+      v_std = np.array(v_std)
+      
+      fig, ax1 = plt.subplots()
+      ax1.set_xlabel(feature)
+      ax1.set_ylabel('mean '+yname)
+      ax1.set_ylim([0,(v_mean+v_std).max()*1.05])
+      ax1.set_xticks(bins_pos)
+      ax1.plot(bins_pos, v_mean, label='mean '+yname)
+      ax1.fill_between(bins_pos, v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
+      
+      color = 'tab:red'
+      ax2 = ax1.twinx()
+      ax2.plot(bins_pos, hist, 'o-', label='bin count', color=color)
+      ax2.set_ylim([0, np.array(hist).max()*1.2])
+      ax2.set_ylabel('bin_count', color=color)
+      
+      if writefolder:
+        plt.savefig(writefolder+'/scatter_'+features+'.png')
+      else:      
+        plt.show()
+        
+
+
+
+
+
 # from https://scikit-learn.org/stable/auto_examples/model_selection/plot_learning_curve.html
 ''' Example of use
 scoring = 'f1_weighted'
