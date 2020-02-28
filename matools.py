@@ -41,7 +41,7 @@ import IPython
 
 from sklearn.feature_selection import RFECV, RFE
 
-from collections import namedtuple
+from collections import namedtuple, Counter
 
 
 from sklearn.model_selection import learning_curve
@@ -51,7 +51,7 @@ scoring = 'f1_weighted'
 modelname = 'Logit'
 plot_learning_curve(clf, modelname+', scoring='+scoring, X, Y, scoring=scoring, axes=None, ylim=None, cv=None, n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5), filename=fig_folder+'/learning_curve_'+modelname+'_scoring_'+scoring+'.png')
 '''
-def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, ylim=None, cv=None, n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5), filename=None):
+def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, ylim=None, cv=3, n_jobs=None, train_sizes=np.linspace(.3, 1.0, 5), filename=None):
 
     if axes is None:
         plt.figure(figsize=(10, 5))
@@ -65,6 +65,7 @@ def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, yl
     train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs,
                        train_sizes=train_sizes,
                        scoring=scoring,
+                       #shuffle=True,
                        )
                        
     train_scores_mean = np.mean(train_scores, axis=1)
@@ -240,7 +241,7 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
 
 
   # SVC
-  C_list = np.logspace(np.log10(1), np.log10(1000), num=6)
+  C_list = np.logspace(np.log10(1), np.log10(1000), num=20)
   C_list = [str(x) for x in C_list]
   gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=6)
   gamma_list = [str(x) for x in gamma_list]
@@ -254,7 +255,7 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
   rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.001), np.log10(4), num=10)
+  C_list = np.logspace(np.log10(0.001), np.log10(4), num=20)
   C_list = [str(x) for x in C_list]
   #clf = LogisticRegression(penalty='l2', solver='lbfgs', multi_class='multinomial')
   logit_params_list = ['logit '+' '+x for x in C_list]
@@ -444,9 +445,9 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   '''
   
   # SVC
-  C_list = np.logspace(np.log10(1), np.log10(1000), num=6)
+  C_list = np.logspace(np.log10(1), np.log10(1000), num=12)
   C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=6)
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=12)
   gamma_list = [str(x) for x in gamma_list]
 
   svc_kernel = 'rbf'
@@ -458,7 +459,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.001), np.log10(4), num=10)
+  C_list = np.logspace(np.log10(0.001), np.log10(4), num=30)
   C_list = [str(x) for x in C_list]
   logit_params_list = ['logit '+' '+x for x in C_list]
 
@@ -475,6 +476,8 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
     plt.xlabel('Parameter set number')
     plt.title('')
 
+
+  best_params_all = list()
 
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
@@ -495,6 +498,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
     '''
    
     best_params = params_list[params_scores.argmax()]
+    best_params_all.append(best_params)
     best_params_idx = params_scores.argmax()
 
     clf = get_model_ml_(best_params)
@@ -541,6 +545,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
     plt.savefig(writefolder+'/'+'nested_cross_validation_scores.png', dpi=100)
   
 
+  return best_params_all
 
 
 def part_feature_study(feature, df_a, y_name, pathfile=None):
@@ -982,11 +987,19 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
       s = s + 'aug check: undersampling\n'
       rus = RandomUnderSampler()
       X_train_aug, Y_train_aug = rus.fit_resample(X[train], Y[train])
+      s = s + 'X[train] shape: {}, Y[train] shape: {}\n'.format(X[train].shape, Y[train].shape)
+      s = s + 'X_train_aug shape: {}, Y_train_aug shape: {}\n'.format(X_train_aug.shape, Y_train_aug.shape)
+      s = s + 'Y_train {}\n'.format(sorted(Counter(Y[train]).items()))
+      s = s + 'Y_train_aug {}\n'.format(sorted(Counter(Y_train_aug).items()))
 
     if augmented == 'oversampling':
       s = s + 'aug check: oversampling\n'
       ros = RandomOverSampler()
       X_train_aug, Y_train_aug = ros.fit_resample(X[train], Y[train])
+      s = s + 'X[train] shape: {}, Y[train] shape: {}\n'.format(X[train].shape, Y[train].shape)
+      s = s + 'X_train_aug shape: {}, Y_train_aug shape: {}\n'.format(X_train_aug.shape, Y_train_aug.shape)
+      s = s + 'Y_train {}\n'.format(sorted(Counter(Y[train]).items()))
+      s = s + 'Y_train_aug {}\n'.format(sorted(Counter(Y_train_aug).items()))
 
     # treino e predicoes
     clf.fit(X_train_aug, Y_train_aug)
