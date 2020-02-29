@@ -68,7 +68,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
         bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
 
       v_mean = np.array(v_mean)
-      v_std = np.array(v_std)
+      v_std = np.array(v_std)/np.sqrt(hist)
       
       fig, ax1 = plt.subplots()
       ax1.set_xlabel(feature)
@@ -89,7 +89,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
       ax2.set_ylabel('bin_count', color=color)
       
       if writefolder:
-        plt.savefig(writefolder+'/scatter_'+features+'.png')
+        plt.savefig(writefolder+'/scatter_'+feature+'.png')
       else:      
         plt.tight_layout()
         plt.show()
@@ -105,14 +105,14 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
         v_std.append(v.std())
 
       v_mean = np.array(v_mean)
-      v_std = np.array(v_std)
+      v_std = np.array(v_std)/np.sqrt(hist)
       
       fig, ax1 = plt.subplots()
       ax1.set_xlabel(feature)
       ax1.set_ylabel('mean '+yname)
       ax1.set_ylim([0,(v_mean+v_std).max()*1.05])
       ax1.set_xticks(bins_pos)
-      ax1.plot(bins_pos, v_mean, label='mean '+yname)
+      ax1.plot(bins_pos, v_mean, 'o-', label='mean '+yname)
       ax1.fill_between(bins_pos, v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
       
       color = 'tab:red'
@@ -122,7 +122,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
       ax2.set_ylabel('bin_count', color=color)
       
       if writefolder:
-        plt.savefig(writefolder+'/scatter_'+features+'.png')
+        plt.savefig(writefolder+'/scatter_'+feature+'.png')
       else:      
         plt.show()
         
@@ -137,7 +137,7 @@ scoring = 'f1_weighted'
 modelname = 'Logit'
 plot_learning_curve(clf, modelname+', scoring='+scoring, X, Y, scoring=scoring, axes=None, ylim=None, cv=None, n_jobs=None, train_sizes=np.linspace(.1, 1.0, 5), filename=fig_folder+'/learning_curve_'+modelname+'_scoring_'+scoring+'.png')
 '''
-def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, ylim=None, cv=3, n_jobs=None, train_sizes=np.linspace(.3, 1.0, 5), filename=None):
+def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, ylim=None, cv=3, n_jobs=None, train_sizes=np.linspace(.4, 1.0, 5), filename=None):
 
     if axes is None:
         plt.figure(figsize=(10, 5))
@@ -205,16 +205,18 @@ def eliminate_cols_nan(df, thr):
 ###  
 def eliminate_records_nan(df, thr):
   # thr entre 0 e 1
-  n_feat = df.shape[1]
+  n_feat = df.shape[1] # as feats eh df.shape[1]
 
   if thr <= 1 and thr >= 0:
-    n_feat_max = int(n_feat * thr)
+    n_feat_nan_max = int(n_feat * thr)
   else:
-    n_feat_max = int(thr)
+    n_feat_nan_max = int(thr)
 
-  records_to_delete = (np.isnan(df).sum(axis=1)>n_feat_max).to_numpy().nonzero()[0]
+  records_to_delete = (np.isnan(df).sum(axis=1)>n_feat_nan_max).to_numpy().nonzero()[0]
 
-  df = df.drop(records_to_delete)
+  #IPython.embed()
+
+  df = df.drop(records_to_delete, axis=0)
 
   return df, records_to_delete
 
@@ -1270,44 +1272,4 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
 
 
 
-
-def eliminate_cols_nan(df, thr):
- 
-  # thr entre 0 e 1
-  n_records = df.shape[0]
-  
-  if thr <= 1 and thr >= 0:
-    n_nans_max = int(n_records * thr)
-  else:
-    n_nans_max = int(thr)
-  
-  feats_to_delete = list()
-
-  for col in df.columns:
-    try:
-      if np.isnan(df[col]).sum() > n_nans_max:
-        feats_to_delete.append(col)
-    except:
-      print ('Erro na col '+str(col)+'. Coluna ignorada.')
-
-  df = df.drop(columns=feats_to_delete)
-
-  return df, feats_to_delete
-
-###  
-def eliminate_records_nan(df, thr):
- 
-  # thr entre 0 e 1
-  n_feat = df.shape[1]
-
-  if thr <= 1 and thr >= 0:
-    n_feat_max = int(n_feat * thr)
-  else:
-    n_feat_max = int(thr)
-
-  records_to_delete = (np.isnan(df).sum(axis=1)>n_feat_max).to_numpy().nonzero()[0]
-
-  df = df.drop(records_to_delete)
-
-  return df, records_to_delete
 
