@@ -329,9 +329,9 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
 
 
   # SVC
-  C_list = np.logspace(np.log10(1), np.log10(1000), num=20)
+  C_list = np.logspace(np.log10(1), np.log10(1000), num=50)
   C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=6)
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=20)
   gamma_list = [str(x) for x in gamma_list]
 
   svc_kernel = 'rbf'
@@ -343,7 +343,7 @@ def grid_search_nested(X, Y, cv=3, writefolder=None):
   rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.001), np.log10(4), num=20)
+  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=100)
   C_list = [str(x) for x in C_list]
   #clf = LogisticRegression(penalty='l2', solver='lbfgs', multi_class='multinomial')
   logit_params_list = ['logit '+' '+x for x in C_list]
@@ -498,7 +498,6 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
 
   # laco dos folds
   cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(42))
 
   Y_pred_proba_geral = np.zeros(shape=Y.shape)
   Y_pred_geral = np.zeros(shape=Y.shape)
@@ -533,9 +532,9 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   '''
   
   # SVC
-  C_list = np.logspace(np.log10(1), np.log10(1000), num=12)
+  C_list = np.logspace(np.log10(1), np.log10(1000), num=10)
   C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=12)
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=10)
   gamma_list = [str(x) for x in gamma_list]
 
   svc_kernel = 'rbf'
@@ -547,7 +546,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.001), np.log10(4), num=30)
+  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=50)
   C_list = [str(x) for x in C_list]
   logit_params_list = ['logit '+' '+x for x in C_list]
 
@@ -597,7 +596,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
     if writefolder:
       s = s + '####### FOLD {} of {} #####\n'.format(i+1, cv)
       for param, score, std in zip(params_list, params_scores, params_std_scores):
-        s = s + 'param: {}, score: {:.3} ({:.3})\n'.format(param, score, std)
+        s = s + 'param: {}, score: {:.3} ({:.4})\n'.format(param, score, std)
       s = s + '* Best params: {}, idx: {} - score: {:.3}\n'.format(best_params, best_params_idx, params_scores[best_params_idx])
       
       s = s + '*** Evaluation phase ***\n'
@@ -867,7 +866,9 @@ def rfe(X, Y, pathfile=None, labels=[]):
 
 
 
-def rfe_cv(X, Y, cv=3, pathfile=None, labels=[]):
+def rfe_cv(list_models_params, X, Y, cv=3, pathfile=None, labels=[]):
+
+  linewidth = 4
 
   s = '######## Report RFE CV ######\n'
 
@@ -877,60 +878,90 @@ def rfe_cv(X, Y, cv=3, pathfile=None, labels=[]):
   plt.ylabel("Cross validation score")
 
   # Create the RFE object and compute a cross-validated score.
-  svc = svm.SVC(kernel="linear", class_weight='balanced')
+  '''
+  svc = svm.SVC(kernel="linear", class_weight='balanced', probability=False)
   rfecv = RFECV(estimator=svc, step=1, cv=cv, scoring='accuracy')
   rfecv.fit(X, Y)
-  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, label='SVC score accuracy')
-
-  '''
-  ipshell = InteractiveShellEmbed(config=Config(),
-                       banner1 = 'Dropping into IPython',
-                       exit_msg = 'Leaving Interpreter, back to program.')
-
-  ipshell('***Called from top level. '
-        'Hit Ctrl-D to exit interpreter and continue program.\n'
-        'Note that if you use %kill_embedded, you can fully deactivate\n'
-        'This embedded instance so it will never turn on again')
-  '''
-  
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='SVC score accuracy')
+ 
   s = s + '#############################\n'
   s = s + 'SVC score accuracy\n'
   s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
   s = s + 'Ranking:\n'
   for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
     s = s + str(line) + '\n'
+  '''
 
-
+  '''
   svc = svm.SVC(kernel="linear", class_weight='balanced')
   rfecv = RFECV(estimator=svc, step=1, cv=cv, scoring='recall')
   rfecv.fit(X, Y)
-  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, label='SVC score recall')
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='SVC score recall')
   s = s + '#############################\n'
   s = s + 'SVC score recall\n'
   s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
   s = s + 'Ranking:\n'
   for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
     s = s + str(line) + '\n'
+  '''
+
+  if list_models_params:
+    for model in list_models_params:
+      modelname = model.replace(' ','_')
+      clf = get_model_ml_(model)
+      if not (hasattr(clf, 'coef_') or hasattr(clf, 'feature_importances_')):
+        print ('modelo '+model+' nao suporta feature importance')
+        continue
+      
+      # Create the RFE object and compute a cross-validated score.
+      #svc = svm.SVC(kernel="linear", class_weight='balanced', probability=True)
+      rfecv = RFECV(estimator=clf, step=1, cv=cv, scoring='roc_auc')
+      rfecv.fit(X, Y)
+      plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='AUC-'+modelname)
 
 
+      s = s + '#############################\n'
+      s = s + ''+modelname+' score auc\n'
+      s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
+      s = s + 'Ranking:\n'
+      for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
+        s = s + str(line) + '\n'
 
+  
   # Create the RFE object and compute a cross-validated score.
-  estimator = LogisticRegression(solver='lbfgs', multi_class='multinomial', class_weight='balanced')
-  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='accuracy')
+  svc = svm.SVC(kernel="linear", class_weight='balanced', probability=True)
+  rfecv = RFECV(estimator=svc, step=1, cv=cv, scoring='roc_auc')
   rfecv.fit(X, Y)
-  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, label='Logit score accuracy')
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='AUC-SVC Linear')
+
+
   s = s + '#############################\n'
-  s = s + 'Logit score accuracy\n'
+  s = s + 'SVC score auc\n'
   s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
   s = s + 'Ranking:\n'
   for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
     s = s + str(line) + '\n'
 
 
+  # Create the RFE object and compute a cross-validated score.
+  '''
   estimator = LogisticRegression(solver='lbfgs', multi_class='multinomial', class_weight='balanced')
-  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='recall')
+  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='accuracy')
   rfecv.fit(X, Y)
-  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, label='Logit score recall')
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='Logit score accuracy')
+  s = s + '#############################\n'
+  s = s + 'Logit score accuracy\n'
+  s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
+  s = s + 'Ranking:\n'
+  for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
+    s = s + str(line) + '\n'
+  '''
+  
+  ####
+  estimator = LogisticRegression(solver='lbfgs', multi_class='multinomial', class_weight='balanced')
+  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='roc_auc')
+  rfecv.fit(X, Y)
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='AUC-Logit')
   s = s + '#############################\n'
   s = s + 'Logit score recall\n'
   s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
@@ -938,8 +969,26 @@ def rfe_cv(X, Y, cv=3, pathfile=None, labels=[]):
   for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
     s = s + str(line) + '\n'
 
+  ###
+  '''
+  estimator = LogisticRegression(solver='lbfgs', multi_class='multinomial', class_weight='balanced')
+  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='recall')
+  rfecv.fit(X, Y)
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='Logit score recall')
+  s = s + '#############################\n'
+  s = s + 'Logit score recall\n'
+  s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
+  s = s + 'Ranking:\n'
+  for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
+    s = s + str(line) + '\n'
+  '''
+  
  
-  plt.legend(loc="upper right")
+  plt.legend(loc="lower right")
+
+  file_ = open(pathfile+'/rfe_cv_report.txt', 'w')
+  file_.write(s)
+  file_.close()
 
   if pathfile:
     plt.savefig(pathfile+'/rfe_cv_balanced_true.png')
@@ -1218,7 +1267,7 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
   plt.legend(loc="lower right")
   plt.tight_layout()
   if write_folder:
-    plt.savefig(write_folder+'/roc_curve_RFC_.png')
+    plt.savefig(write_folder+'/roc_curve_'+modelstring.replace(' ', '_')+'_.png')
   else:
     plt.show()
 
