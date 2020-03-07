@@ -52,31 +52,37 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
 
   for feature in features:
 
-    bins_pos = np.percentile(df[feature].values, np.linspace(0,100,n+1))
+    # tirando os nans
+    df_temp = df[~np.isnan(df[feature])][[feature, yname]]
+
+    bins_pos = np.percentile(df_temp[feature].values, np.linspace(0,100,n+1))
     v_mean = list()
     v_std = list()
     
     if bins_pos.size == np.unique(bins_pos).size: # variavel continua
-      hist, _ = np.histogram(df[feature], bins_pos)
+      hist, _ = np.histogram(df_temp[feature], bins_pos)
       xtickslabel = list()
       bin_pos_label = list()
       for i in range(bins_pos.size-1): # vou pegar cada intervalo agora e calcular a media de y
-        v = df[(df[feature].values >= bins_pos[i]) & (df[feature].values < bins_pos[i+1])][yname].values
-        xtickslabel.append(str(bins_pos[i])+'-'+str(bins_pos[i+1]))
-        v_mean.append(v.mean())
-        v_std.append(v.std())
-        bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
+        v = df_temp[(df_temp[feature].values >= bins_pos[i]) & (df_temp[feature].values < bins_pos[i+1])][yname].values
+        if np.isnan(v.mean()) or np.isnan(v.std()) or abs(v.mean())==float('inf') or abs(v.std())==float('inf'):
+          continue
+        else:
+          xtickslabel.append('['+str(bins_pos[i])+'-'+str(bins_pos[i+1])+'[')
+          v_mean.append(v.mean())
+          v_std.append(v.std())
+          bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
 
       v_mean = np.array(v_mean)
       v_std = np.array(v_std)/np.sqrt(hist)
       
       fig, ax1 = plt.subplots()
       ax1.set_xlabel(feature)
-      ax1.set_ylabel('mean '+yname)
-      ax1.set_ylim([0,(v_mean+v_std).max()*1.05])
+      ax1.set_ylabel('mean ' + yname)
+      ax1.set_ylim([0, (v_mean+v_std).max()*1.05])
       ax1.set_xticks(bin_pos_label)
       #ax1.plot(bins_pos[:-1], v_mean, label='mean '+yname)
-      ax1.plot(bin_pos_label, v_mean, label='mean '+yname)
+      ax1.plot(bin_pos_label, v_mean, 'o-', label='mean '+yname)
       ax1.set_xticklabels(xtickslabel, rotation=35)
       #ax1.fill_between(bins_pos[:-1], v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
       ax1.fill_between(bin_pos_label, v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
@@ -84,7 +90,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
       color = 'tab:red'
       ax2 = ax1.twinx()
       #ax2.plot(bins_pos[:-1], hist, 'o-', label='bin count', color=color)
-      ax2.plot(bin_pos_label, hist, 'o-', label='bin count', color=color)
+      ax2.plot(bin_pos_label, hist, 'o--', label='bin count', color=color)
       ax2.set_ylim([0, hist.max()*1.2])
       ax2.set_ylabel('bin_count', color=color)
       
@@ -97,10 +103,10 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
       bins_pos = np.unique(bins_pos)
       hist = list()
       for value in bins_pos:
-        hist.append((df[feature].values==value).sum())
+        hist.append((df_temp[feature].values==value).sum())
       #hist, _ = np.histogram(df[feature], bins_pos)
       for i in range(bins_pos.size): # vou pegar cada intervalo agora e calcular a media de y
-        v = df[df[feature].values == bins_pos[i]][yname].values
+        v = df_temp[df_temp[feature].values == bins_pos[i]][yname].values
         v_mean.append(v.mean())
         v_std.append(v.std())
 
@@ -117,7 +123,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
       
       color = 'tab:red'
       ax2 = ax1.twinx()
-      ax2.plot(bins_pos, hist, 'o-', label='bin count', color=color)
+      ax2.plot(bins_pos, hist, 'o--', label='bin count', color=color)
       ax2.set_ylim([0, np.array(hist).max()*1.2])
       ax2.set_ylabel('bin_count', color=color)
       
@@ -151,7 +157,7 @@ def plot_learning_curve(estimator, title, X, y, scoring='roc_auc', axes=None, yl
     train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs,
                        train_sizes=train_sizes,
                        scoring=scoring,
-                       #shuffle=True,
+                       shuffle=True,
                        )
                        
     train_scores_mean = np.mean(train_scores, axis=1)
@@ -184,10 +190,13 @@ def eliminate_cols_nan(df, thr):
   # thr entre 0 e 1
   n_records = df.shape[0]
   
-  if thr <= 1 and thr >= 0:
+  if (type(thr) is float) and (thr <= 1 and thr >= 0):
     n_nans_max = int(n_records * thr)
-  else:
+  elif type(thr) is int:
     n_nans_max = int(thr)
+  else:
+    print ('Variavel threshold nao reconhecida.')
+    return None
   
   feats_to_delete = list()
 
@@ -203,14 +212,20 @@ def eliminate_cols_nan(df, thr):
   return df, feats_to_delete
 
 ###  
-def eliminate_records_nan(df, thr):
+def eliminate_records_nan(df, thr, reset_index=False):
   # thr entre 0 e 1
   n_feat = df.shape[1] # as feats eh df.shape[1]
+  
+  df = df.reset_index(drop=True)
 
-  if thr <= 1 and thr >= 0:
+  if (type(thr) is float) and (thr <= 1 and thr >= 0):
     n_feat_nan_max = int(n_feat * thr)
-  else:
+  elif type(thr) is int:
     n_feat_nan_max = int(thr)
+  else:
+    print ('Variavel threshold nao reconhecida.')
+    return None
+
 
   records_to_delete = (np.isnan(df).sum(axis=1)>n_feat_nan_max).to_numpy().nonzero()[0]
 
@@ -442,9 +457,9 @@ def get_model_ml_(params):
 
   elif params.split()[0] == 'rfc':
     if params.split()[1].lower()  == 'none':
-      clf = RandomForestClassifier(n_estimators=100, max_depth=None)
+      clf = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_split=int(params.split()[2]))
     else:        
-      clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]))
+      clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]), min_samples_split=int(params.split()[2]))
 
   elif params.split()[0] == 'logit':
     if params.split()[1].lower()  == 'none':
@@ -532,9 +547,9 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   '''
   
   # SVC
-  C_list = np.logspace(np.log10(1), np.log10(1000), num=10)
+  C_list = np.logspace(np.log10(0.1), np.log10(1000), num=20)
   C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=10)
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=20)
   gamma_list = [str(x) for x in gamma_list]
 
   svc_kernel = 'rbf'
@@ -542,11 +557,15 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   svc_params_list = ['svc '+' '.join(x) for x in svc_params_list]
   
   # RF
-  max_depth_list = ['2', '4', '8', 'None']
-  rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
+  max_depth_list = ['2', '3', '4', '5', '8', '10', '12', '16', '20', '26', '34', '40', '60', 'None']
+  min_samples_split_list = ['2', '4', '8', '20']
+
+  rfc_params_list = list(itertools.product(max_depth_list, min_samples_split_list))
+  rfc_params_list = ['rfc '+' '.join(x) for x in rfc_params_list]
+  #rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=50)
+  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=150)
   C_list = [str(x) for x in C_list]
   logit_params_list = ['logit '+' '+x for x in C_list]
 
@@ -909,6 +928,7 @@ def rfe_cv(list_models_params, X, Y, cv=3, pathfile=None, labels=[]):
     for model in list_models_params:
       modelname = model.replace(' ','_')
       clf = get_model_ml_(model)
+      clf.fit(np.array([1,0,0,0]).reshape(-1, 1), [1,0,0,0]) # isso eh soh para abrir o atributo feature_importances
       if not (hasattr(clf, 'coef_') or hasattr(clf, 'feature_importances_')):
         print ('modelo '+model+' nao suporta feature importance')
         continue
@@ -1108,7 +1128,7 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
   for train, test in cv_folds.split(X, Y):
 
     # essa linha h soh pra setar caso o augmented seja None
-    if augmented == None:
+    if augmented == None or augmented == 'custom':
       X_train_aug, Y_train_aug = X[train].copy(), Y[train].copy()
 
     # agora eh necessario checar o aumento de dados
