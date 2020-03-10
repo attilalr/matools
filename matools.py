@@ -246,8 +246,7 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multic
   return_named_tuple = namedtuple('return_named_tuple', ('clf', 'smote', 'cv', 'accuracy', 'recall', 'auc', 'f1_score'))
 
   # laco dos folds
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(42))
+  cv_folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=int(time.time()))
 
   scores_f1 = list()
   scores_precision = list()
@@ -456,10 +455,27 @@ def get_model_ml_(params):
     clf = svm.SVC(C=C_parameter, gamma=gamma_parameter, kernel='rbf', probability=True)
 
   elif params.split()[0] == 'rfc':
-    if params.split()[1].lower()  == 'none':
-      clf = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_split=int(params.split()[2]))
-    else:        
-      clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]), min_samples_split=int(params.split()[2]))
+    if len(params.split()) != 4:
+      if params.split()[1].lower()  == 'none':
+        clf = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_split=int(params.split()[2]))
+      else:        
+        clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]), min_samples_split=int(params.split()[2]))
+    else: # aqui eh pra entrar o n_est
+      try:
+        max_depth = int(params.split()[1])
+      except:
+        max_depth = None
+      try:
+        min_samples_split = int(params.split()[2])
+      except:
+        print ('Erro '+params)
+        sys.exit(0)
+      try:
+        n_estimators = int(params.split()[3])
+      except:
+        print ('Erro '+params)
+        sys.exit(0)
+      clf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split)
 
   elif params.split()[0] == 'logit':
     if params.split()[1].lower()  == 'none':
@@ -512,7 +528,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
     print ('Erro! flag multiclass.')
 
   # laco dos folds
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=int(time.time()))
 
   Y_pred_proba_geral = np.zeros(shape=Y.shape)
   Y_pred_geral = np.zeros(shape=Y.shape)
@@ -754,7 +770,7 @@ def rfe(X, Y, pathfile=None, labels=[]):
   plt.plot (x_, selector.ranking_, linewidth=linewidth, label='RFC')
 
   # est 3
-  estimator = RandomForestClassifier(n_estimators=600, max_depth=2)
+  estimator = RandomForestClassifier(n_estimators=1000, max_depth=2, n_jobs=10)
   selector = RFE(estimator, 1, step=1)
   selector = selector.fit(X, Y)
   print (selector.ranking_)
@@ -803,7 +819,7 @@ def rfe(X, Y, pathfile=None, labels=[]):
   plt.plot (x_, selector.ranking_, linewidth=linewidth, label='RFC')
 
   # est 3
-  estimator = RandomForestClassifier(n_estimators=600, max_depth=2, class_weight='balanced')
+  estimator = RandomForestClassifier(n_estimators=600, max_depth=2, class_weight='balanced', n_jobs=10)
   selector = RFE(estimator, 1, step=1)
   selector = selector.fit(X, Y)
   print (selector.ranking_)
@@ -857,7 +873,7 @@ def rfe(X, Y, pathfile=None, labels=[]):
   plt.plot (x_, selector.ranking_, linewidth=linewidth, label='RFC')
 
   # est 3
-  estimator = RandomForestClassifier(n_estimators=600, max_depth=2, class_weight='balanced')
+  estimator = RandomForestClassifier(n_estimators=600, max_depth=2, class_weight='balanced', n_jobs=10)
   selector = RFE(estimator, 1, step=1)
   selector = selector.fit(Xus, Yus)
   print (selector.ranking_)
@@ -979,7 +995,7 @@ def rfe_cv(list_models_params, X, Y, cv=3, pathfile=None, labels=[]):
   
   ####
   estimator = LogisticRegression(solver='lbfgs', multi_class='multinomial', class_weight='balanced')
-  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='roc_auc')
+  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='roc_auc', n_jobs=10)
   rfecv.fit(X, Y)
   plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='AUC-Logit')
   s = s + '#############################\n'
@@ -1003,6 +1019,16 @@ def rfe_cv(list_models_params, X, Y, cv=3, pathfile=None, labels=[]):
     s = s + str(line) + '\n'
   '''
   
+  estimator = RandomForestClassifier(n_estimators=2000, max_depth=2, class_weight='balanced')
+  rfecv = RFECV(estimator=estimator, step=1, cv=cv, scoring='roc_auc', n_jobs=20)
+  rfecv.fit(X, Y)
+  plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_, linewidth=linewidth, label='AUC-RF-MaxDepth-2')
+  s = s + '#############################\n'
+  s = s + 'RF maxdepth-2 score recall\n'
+  s = s + 'features selecionadas: {}\n'.format(' '.join(labels[rfecv.support_]))
+  s = s + 'Ranking:\n'
+  for line in  np.array(sorted(list(zip(rfecv.ranking_,labels)))):
+    s = s + str(line) + '\n'
  
   plt.legend(loc="lower right")
 
@@ -1330,10 +1356,10 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
 
     s = s + '============================================================'
 
-    tchart(np.array(a).T[1], np.array(a).T[0].astype('float'), title='Feature importance', pathfile=write_folder+'/tchart_'+modelname+'.png')
+    tchart(np.array(a).T[1], np.array(a).T[0].astype('float'), title='Feature importance', pathfile=write_folder+'/tchart_'+modelstring.replace(' ','_')+'.png')
 
   if write_folder:
-    file_ = open(write_folder+'/report_'+modelname+'.txt', 'w')
+    file_ = open(write_folder+'/report_'+modelstring.replace(' ','_')+'.txt', 'w')
     file_.write(s)
     file_.close()
   else:
