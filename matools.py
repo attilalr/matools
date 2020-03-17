@@ -573,7 +573,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   svc_params_list = ['svc '+' '.join(x) for x in svc_params_list]
   
   # RF
-  max_depth_list = ['2', '3', '4', '5', '8', '10', '12', '16', '20', '26', '34', '40', '60', 'None']
+  max_depth_list = ['1', '2', '3', '4', '5', '8', '10', '12', '16', '20', '26', '34', '40', '60', 'None']
   min_samples_split_list = ['2', '4', '8', '20']
 
   rfc_params_list = list(itertools.product(max_depth_list, min_samples_split_list))
@@ -600,6 +600,8 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
 
 
   best_params_all = list()
+  
+  plt.figure(figsize=(18,10))
 
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
@@ -1144,7 +1146,7 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
   s = s + repr(clf) + '\n'
 
   # laco dos folds
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()), shuffle=True)
   scores_f1 = list()
   scores_precision = list()
   scores_recall = list()
@@ -1224,7 +1226,7 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
   df_cm = pd.DataFrame(data, columns=np.unique(Y), index = np.unique(Y))
   df_cm.index.name = 'Actual'
   df_cm.columns.name = 'Predicted'
-  #plt.figure(figsize = (10,7))
+  plt.figure(figsize = (10,7))
   sn.set(font_scale=1.4) #for label size
   sn.heatmap(df_cm, cmap="Blues", fmt='', annot=True, annot_kws={"size": 16,})# font size
   if write_folder:
@@ -1261,13 +1263,13 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
 
 
   # roc curve
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()), shuffle=True)
 
-  #plt.figure(figsize=(10,7))
+  plt.figure(figsize=(10,7))
   plt.clf()
   plt.xlabel('False positive')
   plt.ylabel('True positive')
-  plt.title('ROC CURVE - AUC:{:.3}'.format(auc_))
+  plt.title('ROC curve - AUC:{:.3}'.format(auc_))
 
   # vou fazer esse laco de novo mas o certo eh joger ele no de cima ainda
   for train, test in cv_folds.split(X, Y):
@@ -1299,8 +1301,8 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
 
 
   # plot do modelo todo
-  plt.plot(fpr_all, tpr_all, 'red', label='Auc:{:.3}'.format(auc_))
-  plt.plot(fpr, thresholds, 'brown', label='Thresholds')
+  plt.plot(fpr_all, tpr_all, 'red', label='Auc:{:.3}'.format(auc_), linewidth=4)
+  #plt.plot(fpr, thresholds, 'brown', label='Thresholds')
   #plt.plot(fpr, thresholds[::-1], 'yellow', label='Thresholds')
 
 
@@ -1310,10 +1312,10 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
   plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='b', label='Chance', alpha=.8)
   plt.xlim([-0.05, 1.05])
   plt.ylim([-0.05, 1.05])
-  plt.legend(loc="lower right")
-  plt.tight_layout()
+  plt.legend(loc='lower right')
+  #plt.tight_layout()
   if write_folder:
-    plt.savefig(write_folder+'/roc_curve_'+modelstring.replace(' ', '_')+'_.png')
+    plt.savefig(write_folder+'/roc_curve_'+modelstring.replace(' ', '_')+'.png')
   else:
     plt.show()
 
