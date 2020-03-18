@@ -237,10 +237,9 @@ def eliminate_records_nan(df, thr, reset_index=False):
 
 
 
-def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multiclass=False):
+def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersampling', cv=3, multiclass=False):
 
   n_classes = len(set(Y))
-
 
   # falta instanciar
   return_named_tuple = namedtuple('return_named_tuple', ('clf', 'smote', 'cv', 'accuracy', 'recall', 'auc', 'f1_score'))
@@ -259,24 +258,22 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multic
   for train, test in cv_folds.split(X, Y):
 
     # essa linha h soh pra setar caso o augmented seja None
-    if smote == False:
+    if resampling == None:
       X_train_aug, Y_train_aug = X[train], Y[train]
 
     # agora eh necessario checar o aumento de dados
-    if smote:
+    if resampling == 'smote':
       X_train_aug, Y_train_aug = SMOTE().fit_resample(X[train], Y[train])
 
-    '''
-    if augmented == 'undersampling':
+    if resampling == 'undersampling':
       s = s + 'aug check: undersampling\n'
       rus = RandomUnderSampler()
       X_train_aug, Y_train_aug = rus.fit_resample(X[train], Y[train])
 
-    if augmented == 'oversampling':
+    if resampling == 'oversampling':
       s = s + 'aug check: oversampling\n'
       ros = RandomOverSampler()
       X_train_aug, Y_train_aug = ros.fit_resample(X[train], Y[train])
-    '''
     
     # treino e predicoes
     clf.fit(X_train_aug, Y_train_aug)
@@ -320,121 +317,10 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multic
   #Y_true = Y.copy()
   #confm = confusion_matrix(Y_true, Y_pred_geral)
 
-  r = return_named_tuple (clf, smote, cv, scores_precision, scores_recall, scores_auc, scores_f1)
+  r = return_named_tuple (clf, resampling, cv, scores_precision, scores_recall, scores_auc, scores_f1)
   
   return r
 
-def grid_search_nested(X, Y, cv=3, writefolder=None):
-
-  if len(set(Y)) > 2:
-    multiclass = True
-  elif len(set(Y)) == 2:
-    multiclass = False
-  else:
-    print ('Erro! flag multiclass.')
-
-  # laco dos folds
-  #cv_folds = StratifiedKFold(n_splits=cv, random_state=int(time.time()))
-  cv_folds = StratifiedKFold(n_splits=cv, random_state=int(42))
-
-  Y_pred_proba_geral = np.zeros(shape=Y.shape)
-  Y_pred_geral = np.zeros(shape=Y.shape)
-
-
-
-  # SVC
-  C_list = np.logspace(np.log10(1), np.log10(1000), num=50)
-  C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=20)
-  gamma_list = [str(x) for x in gamma_list]
-
-  svc_kernel = 'rbf'
-  svc_params_list = list(itertools.product(C_list, gamma_list))
-  svc_params_list = ['svc '+' '.join(x) for x in svc_params_list]
-  
-  # RF
-  max_depth_list = ['2', '4', '8', 'None']
-  rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
-
-  # Logit
-  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=100)
-  C_list = [str(x) for x in C_list]
-  #clf = LogisticRegression(penalty='l2', solver='lbfgs', multi_class='multinomial')
-  logit_params_list = ['logit '+' '+x for x in C_list]
-
-  params_list = svc_params_list + rfc_params_list + logit_params_list
-
-  
-  params_scores = np.zeros((len(params_list),))
-  params_std_scores = np.zeros((len(params_list),))
-
-  s = ''
-
-  if (writefolder != None):
-    plt.figure(figsize=(14,8))
-    plt.ylabel('AUC score')
-    plt.xlabel('Parameter set number')
-    plt.title('')
-
-
-  for i, (train, test) in enumerate(cv_folds.split(X, Y)):
-  
-    for k, params in enumerate(params_list):
-
-      print ('parametro {} de {}'.format(k, len(params_list)))
-
-      clf = get_model_ml_(params)
-      
-      return_ = cros_val(clf, X[train], Y[train], metrics=['accuracy', 'recall'], smote=True, cv=3, multiclass=multiclass)
-      params_scores[k] = return_.auc.mean()
-      params_std_scores[k] = return_.auc.std()
-       
-   
-    best_params = params_list[params_scores.argmax()]
-    best_params_idx = params_scores.argmax()
-    
-    clf = get_model_ml_(best_params)
-
-    if writefolder:
-      s = s + '####### FOLD {} of {} #####\n'.format(i+1, cv)
-      for param, score, std in zip(params_list, params_scores, params_std_scores):
-        s = s + 'param: {}, score: {:.2} ({:.2})\n'.format(param, score, std)
-      s = s + '* Best params: {}, idx: {} - score: {:.2}\n'.format(best_params, best_params_idx, params_scores[best_params_idx])
-      
-      s = s + '*** Evaluation phase ***\n'
-      
-      clf.fit(X[train], Y[train])
-      
-      auc_ = roc_auc_score(Y[test], clf.predict_proba(X[test])[:, 1])
-      s = s + 'AUC Ev. score: {:.2}\n'.format(auc_)
-      s = s + '###########################\n'
-
-    else:
-      print ('####### FOLD {} of {} #####'.format(i+1, cv))
-      for param, score, std in zip(params_list, params_scores, params_std_scores):
-        print ('param: {}, score: {:.2} ({:.2})'.format(param, score, std))  
-      print ('* Best params: {}, idx: {} - score: {:.2}'.format(best_params, best_params_idx, params_scores[best_params_idx]))
-      
-      print ('*** Evaluation phase ***')
-      clf.fit(X[train], Y[train])
-      
-      auc_ = roc_auc_score(Y[test], clf.predict_proba(X[test])[:, 1])
-      print ('AUC Ev. score: {:.2}'.format(auc_))
-      print ('###########################')
-
-
-    if (writefolder != None):
-      plt.plot(params_scores, 's-', label='fold {}'.format(i+1))
-      plt.plot([0,len(params_scores)], [auc_, auc_], label='auc fold {}: {:.2}'.format(i+1, auc_))
-
-  
-  file_ = open(writefolder+'/'+'report_nested_cross_validation_hyperparameter_tuning.txt', 'w')
-  file_.write(s)
-  file_.close()
-
-  if (writefolder != None):
-    plt.legend(loc="lower right")
-    plt.savefig(writefolder+'/'+'nested_cross_validation_scores.png', dpi=120)
 
 
 ################# PARALELO
@@ -492,7 +378,7 @@ def get_model_ml_(params):
   return clf
 
 ### function to assist parallel implementation
-def f(params, X, Y, cv):
+def f(params, X, Y, cv, resampling):
 
   print ('rodando params: {}'.format(params))
 
@@ -505,7 +391,7 @@ def f(params, X, Y, cv):
   else:
     print ('Erro! flag multiclass.')
 
-  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=cv, multiclass=multiclass)
+  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling=resampling, cv=cv, multiclass=multiclass)
 
   return return_.auc.mean()
 
@@ -516,7 +402,7 @@ def f(params, X, Y, cv):
 
 
 
-def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
+def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample'):
 
   n_classes = len(set(Y))
 
@@ -606,7 +492,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
 
-    parameters_vector_total = [(x, X[train], Y[train], cv) for x in params_list]
+    parameters_vector_total = [(x, X[train], Y[train], cv, resampling) for x in params_list]
 
     params_scores_partial = list()
     for parameters_vector in [parameters_vector_total[j:j+n_jobs] for j in range(0, len(parameters_vector_total), n_jobs)]:
@@ -614,13 +500,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
         params_scores_partial = params_scores_partial + pool.starmap(f, parameters_vector)
 
     params_scores = np.array(params_scores_partial)
-
-    '''
-    with multiprocessing.Pool(processes=len(params_list)) as pool:
-      parameters_vector = [(x, X[train], Y[train]) for x in params_list]
-      params_scores = np.array(pool.starmap(f, parameters_vector))
-    '''
-   
+  
     best_params = params_list[params_scores.argmax()]
     best_params_all.append(best_params)
     best_params_idx = params_scores.argmax()
@@ -672,7 +552,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30):
   return best_params_all
 
 
-def part_feature_study(feature, df_a, y_name, pathfile=None):
+def part_feature_study(feature, df_a, y_name, pathfile=None, resampling='undersampling'):
 
   type_var = None
 
@@ -718,7 +598,7 @@ def part_feature_study(feature, df_a, y_name, pathfile=None):
         
     clf = RandomForestClassifier(n_estimators=40)
     if (Y==1).sum()>10:
-      auc_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], smote=True, cv=3, multiclass=False).auc.mean()
+      auc_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling=resampling, cv=3, multiclass=False).auc.mean()
     else:
       auc_ = 'na'
     #
