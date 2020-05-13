@@ -43,7 +43,6 @@ from sklearn.feature_selection import RFECV, RFE
 
 from collections import namedtuple, Counter
 
-
 from sklearn.model_selection import learning_curve
 
 
@@ -53,9 +52,14 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
   for feature in features:
 
     # tirando os nans
-    df_temp = df[~np.isnan(df[feature])][[feature, yname]]
 
-    bins_pos = np.percentile(df_temp[feature].values, np.linspace(0,100,n+1))
+    try:
+      df_temp = df[~np.isnan(df[feature])][[feature, yname]]
+
+      bins_pos = np.percentile(df_temp[feature].values, np.linspace(0,100,n+1))
+    except:
+      print ('feature {} with problems.'.format(feature))
+      continue
     v_mean = list()
     v_std = list()
     
@@ -89,13 +93,15 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
       
       color = 'tab:red'
       ax2 = ax1.twinx()
-      #ax2.plot(bins_pos[:-1], hist, 'o-', label='bin count', color=color)
       ax2.plot(bin_pos_label, hist, 'o--', label='bin count', color=color)
+      #ax2.bar(bin_pos_label, hist, label='bin count', color=color)
       ax2.set_ylim([0, hist.max()*1.2])
       ax2.set_ylabel('bin_count', color=color)
       
       if writefolder:
-        plt.savefig(writefolder+'/scatter_'+feature+'.png')
+        feature_ = feature.replace(' ', '_')
+        feature_ = feature_.replace('/', '_')
+        plt.savefig(writefolder+'/scatter_'+feature_+'.png')
       else:      
         plt.tight_layout()
         plt.show()
@@ -327,6 +333,8 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersamplin
 
 def get_model_ml_(params):
 
+  #print (params)
+
   if params.split()[0] == 'svc':
     if params.split()[1] == 'none':
       C_parameter=1.0
@@ -479,15 +487,16 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   s = ''
 
   if (writefolder != None):
-    plt.figure(figsize=(28,12))
+    plt.figure(figsize=(18,10))
     plt.ylabel('AUC score')
     plt.xlabel('Parameter set number')
     plt.title('')
 
 
   best_params_all = list()
+  best_auc_scores_holdout = list()
   
-  plt.figure(figsize=(18,10))
+  #plt.figure(figsize=(12,8))
 
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
@@ -506,7 +515,31 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
     best_params_idx = params_scores.argmax()
 
     clf = get_model_ml_(best_params)
-    clf.fit(X[train], Y[train])
+    
+    ##
+    if resampling == None or resampling == 'None':
+      X_train_aug, Y_train_aug = X[train], Y[train]
+
+    # agora eh necessario checar o aumento de dados
+    if resampling == 'smote':
+      X_train_aug, Y_train_aug = SMOTE().fit_resample(X[train], Y[train])
+
+    if resampling == 'undersampling':
+      rus = RandomUnderSampler()
+      X_train_aug, Y_train_aug = rus.fit_resample(X[train], Y[train])
+
+    if resampling == 'oversampling':
+      ros = RandomOverSampler()
+      X_train_aug, Y_train_aug = ros.fit_resample(X[train], Y[train])
+    
+    # treino e predicoes
+    clf.fit(X_train_aug, Y_train_aug)
+    Y_pred = clf.predict(X[test])
+    #Y_true = Y[test]
+    ##
+    
+    
+    #clf.fit(X[train], Y[train])
     Y_true = Y[test]
     
 
@@ -532,7 +565,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
       s = s + 'AUC Ev. score: {:.3}\n'.format(auc_)
       s = s + '###########################\n'
 
-
+    best_auc_scores_holdout.append(auc_)
 
 
     if (writefolder != None):
@@ -549,7 +582,8 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
     plt.savefig(writefolder+'/'+'nested_cross_validation_scores.png', dpi=100)
   
 
-  return best_params_all
+  return best_params_all, best_auc_scores_holdout
+
 
 
 def part_feature_study(feature, df_a, y_name, pathfile=None, resampling='undersampling'):
@@ -989,6 +1023,8 @@ def gerar_hists(df, fig_folder):
     df[variable].plot.hist(stacked=False, bins=20)
     plt.xlabel(variable)
     plt.ylabel('ocurrences')
+    variable = variable.replace(' ', '_')
+    variable = variable.replace('/', '_')
     if fig_folder != None:
       plt.savefig('./'+fig_folder+'/histograma_var_'+variable+'.png')
     else:
