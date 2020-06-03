@@ -47,7 +47,7 @@ from sklearn.model_selection import learning_curve
 
 
 #
-def univ_scatter(df, features, yname, n=4, writefolder=None):
+def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
 
   for feature in features:
 
@@ -72,7 +72,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None):
         if np.isnan(v.mean()) or np.isnan(v.std()) or abs(v.mean())==float('inf') or abs(v.std())==float('inf'):
           continue
         else:
-          xtickslabel.append('['+str(bins_pos[i])+'-'+str(bins_pos[i+1])+'[')
+          xtickslabel.append('['+'{number:.{digits}f}'.format(number=bins_pos[i], digits=digits)+'-'+'{number:.{digits}f}'.format(number=bins_pos[i+1], digits=digits)+'[')
           v_mean.append(v.mean())
           v_std.append(v.std())
           bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
