@@ -47,7 +47,7 @@ from sklearn.model_selection import learning_curve
 
 
 #
-def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
+def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2, figsize=(10,6)):
 
   for feature in features:
 
@@ -90,7 +90,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
       v_mean = np.array(v_mean)
       v_std = np.array(v_std)/np.sqrt(hist)
       
-      fig, ax1 = plt.subplots()
+      fig, ax1 = plt.subplots(figsize=figsize)
       ax1.set_xlabel(feature)
       ax1.set_ylabel('mean ' + yname)
       ax1.set_ylim([0, (v_mean+v_std).max()*1.05])
@@ -129,10 +129,13 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
       v_mean = np.array(v_mean)
       v_std = np.array(v_std)/np.sqrt(hist)
       
-      fig, ax1 = plt.subplots()
+      fig, ax1 = plt.subplots(figsize=figsize)
       ax1.set_xlabel(feature)
       ax1.set_ylabel('mean '+yname)
-      ax1.set_ylim([0,(v_mean+v_std).max()*1.05])
+      try:
+        ax1.set_ylim([0,(v_mean+v_std).max()*1.05])
+      except:
+        print ('erro INF ou NaN na feature {}'.format(feature))
       ax1.set_xticks(bins_pos)
       ax1.plot(bins_pos, v_mean, 'o-', label='mean '+yname)
       ax1.fill_between(bins_pos, v_mean + v_std, v_mean - v_std, alpha=0.1, color='b')
