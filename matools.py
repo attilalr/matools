@@ -51,6 +51,16 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
 
   for feature in features:
 
+    replace_list = ['/', '\\', ' ', '(', ')']
+
+    feature_string = feature
+    for char in replace_list:
+      feature_string = feature_string.replace(char, '_')
+      
+    yname_string = yname
+    for char in replace_list:
+      yname_string = yname_string.replace(char, '_')
+      
     # tirando os nans
 
     try:
@@ -101,7 +111,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
       if writefolder:
         feature_ = feature.replace(' ', '_')
         feature_ = feature_.replace('/', '_')
-        plt.savefig(writefolder+'/scatter_'+feature_+'.png')
+        plt.savefig(writefolder+'/scatter_feature_'+feature_string+'_y_'+yname_string+'.png')
       else:      
         plt.tight_layout()
         plt.show()
@@ -134,7 +144,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2):
       ax2.set_ylabel('bin_count', color=color)
       
       if writefolder:
-        plt.savefig(writefolder+'/scatter_'+feature+'.png')
+        plt.savefig(writefolder+'/scatter_feature_'+feature_string+'_y_'+yname_string+'.png')
       else:      
         plt.show()
         
