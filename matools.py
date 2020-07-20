@@ -64,7 +64,8 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2, figsize=(
     # tirando os nans
 
     try:
-      df_temp = df[~np.isnan(df[feature])][[feature, yname]]
+      #df_temp = df[~np.isnan(df[feature])][[feature, yname]]
+      df_temp = df[[feature, yname]].dropna()
 
       bins_pos = np.percentile(df_temp[feature].values, np.linspace(0,100,n+1))
     except:
