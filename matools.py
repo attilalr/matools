@@ -94,7 +94,7 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2, figsize=(
       fig, ax1 = plt.subplots(figsize=figsize)
       ax1.set_xlabel(feature)
       ax1.set_ylabel('mean ' + yname)
-      ax1.set_ylim([0, (v_mean+v_std).max()*1.05])
+      ax1.set_ylim([(v_mean-v_std).min()*0.9, (v_mean+v_std).max()*1.05])
       ax1.set_xticks(bin_pos_label)
       #ax1.plot(bins_pos[:-1], v_mean, label='mean '+yname)
       ax1.plot(bin_pos_label, v_mean, 'o-', label='mean '+yname)
@@ -448,22 +448,18 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   C_list = [str(x) for x in C_list]
   gamma_list = np.logspace(np.log10(0.0001), np.log10(4.2), num=10)
   gamma_list = [str(x) for x in gamma_list]
-
   svc_kernel = 'rbf'
   svc_params_list = list(itertools.product(C_list, gamma_list))
   svc_params_list = ['svc '+' '.join(x) for x in svc_params_list]
-
   # Adaboost
   ada_n_estimators = ['3', '5', '20', '60']
   ada_learning_rate = ['1.0', '0.1', '4.0', '5.0']
   ada_params_list = list(itertools.product(ada_n_estimators, ada_learning_rate))
   ada_params_list = ['ada '+' '.join(x) for x in ada_params_list]
-
   
   # RF
   max_depth_list = ['2', '4', '8', '16', 'None']
   rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
-
   # Logit
   C_list = np.logspace(np.log10(0.001), np.log10(200), num=80)
   C_list = [str(x) for x in C_list]
@@ -1296,7 +1292,5 @@ def general_model_report(modelstring, X, Y, write_folder=None, cv=3, balanced=Tr
     file_.close()
   else:
     print (s)
-
-
 
 
