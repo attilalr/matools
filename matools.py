@@ -47,7 +47,7 @@ from sklearn.model_selection import learning_curve
 
 
 #
-def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2, figsize=(10,6)):
+def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2, figsize=(10,6), bins_pos_real=True):
 
   for feature in features:
 
@@ -86,7 +86,10 @@ def univ_scatter(df, features, yname, n=4, writefolder=None, digits=2, figsize=(
           xtickslabel.append('['+'{number:.{digits}f}'.format(number=bins_pos[i], digits=digits)+'-'+'{number:.{digits}f}'.format(number=bins_pos[i+1], digits=digits)+'[')
           v_mean.append(v.mean())
           v_std.append(v.std())
-          bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
+          if bins_pos_real:
+            bin_pos_label.append((bins_pos[i]+bins_pos[i+1])/2)
+          else:
+            bin_pos_label.append(i)          
 
       v_mean = np.array(v_mean)
       v_std = np.array(v_std)/np.sqrt(hist)
@@ -467,9 +470,9 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   '''
   
   # SVC
-  C_list = np.logspace(np.log10(0.1), np.log10(1000), num=20)
+  C_list = np.logspace(np.log10(0.1), np.log10(1000), num=6)
   C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=20)
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=6)
   gamma_list = [str(x) for x in gamma_list]
 
   svc_kernel = 'rbf'
@@ -477,7 +480,8 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   svc_params_list = ['svc '+' '.join(x) for x in svc_params_list]
   
   # RF
-  max_depth_list = ['1', '2', '3', '4', '5', '8', '10', '12', '16', '20', '26', '34', '40', '60', 'None']
+  #max_depth_list = ['1', '2', '3', '4', '5', '8', '10', '12', '16', '20', '26', '34', '40', '60', 'None']
+  max_depth_list = ['1', '2', '4', '8', '20','60', 'None']
   min_samples_split_list = ['2', '4', '8', '20']
 
   rfc_params_list = list(itertools.product(max_depth_list, min_samples_split_list))
@@ -485,7 +489,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   #rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=150)
+  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=10)
   C_list = [str(x) for x in C_list]
   logit_params_list = ['logit '+' '+x for x in C_list]
 
