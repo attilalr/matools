@@ -256,7 +256,9 @@ def eliminate_records_nan(df, thr, reset_index=False):
 
 
 
-def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersampling', cv=3, multiclass=False):
+def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersampling', cv=3, multiclass=False, seed=None):
+
+  assert isinstance(seed, int)
 
   n_classes = len(set(Y))
 
@@ -264,7 +266,7 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersamplin
   return_named_tuple = namedtuple('return_named_tuple', ('clf', 'smote', 'cv', 'accuracy', 'recall', 'auc', 'f1_score'))
 
   # laco dos folds
-  cv_folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=int(time.time()))
+  cv_folds = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
 
   scores_f1 = list()
   scores_precision = list()
@@ -399,7 +401,7 @@ def get_model_ml_(params):
   return clf
 
 ### function to assist parallel implementation
-def f(params, X, Y, cv, resampling):
+def f(params, X, Y, cv, resampling, seed):
 
   print ('rodando params: {}'.format(params))
 
@@ -412,7 +414,7 @@ def f(params, X, Y, cv, resampling):
   else:
     print ('Erro! flag multiclass.')
 
-  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling=resampling, cv=cv, multiclass=multiclass)
+  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling=resampling, cv=cv, multiclass=multiclass, seed=seed)
 
   return return_.auc.mean()
 
@@ -423,9 +425,16 @@ def f(params, X, Y, cv, resampling):
 
 
 
-def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample'):
+def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample', roc_curve_output=False)):
 
   n_classes = len(set(Y))
+
+  seed = int(time.time())
+
+  if roc_curve_output:
+    mean_fpr = np.linspace(0, 1, 100)
+    tprs = list()
+
 
   if len(set(Y)) > 2:
     multiclass = True
@@ -511,7 +520,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
 
-    parameters_vector_total = [(x, X[train], Y[train], cv, resampling) for x in params_list]
+    parameters_vector_total = [(x, X[train], Y[train], cv, resampling, seed) for x in params_list]
 
     params_scores_partial = list()
     for parameters_vector in [parameters_vector_total[j:j+n_jobs] for j in range(0, len(parameters_vector_total), n_jobs)]:
@@ -571,6 +580,14 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
       else:
         auc_ = roc_auc_score(Y[test], clf.predict_proba(X[test])[:, 1])
 
+        if roc_curve_output:
+          Y_pred_proba = clf.predict_proba(X[test])
+          fpr_, tpr_, thresholds_ = roc_curve(Y_true, Y_pred_proba[:, 1])
+
+          interp_tpr = np.interp(mean_fpr, fpr_, tpr_)
+          interp_tpr[0] = 0.0
+          tprs.append(interp_tpr)
+
 
       s = s + 'AUC Ev. score: {:.3}\n'.format(auc_)
       s = s + '###########################\n'
@@ -582,6 +599,11 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
       plt.plot(params_scores, 's-', label='fold {}'.format(i+1))
       plt.plot([0,len(params_scores)], [auc_, auc_], label='auc fold {}: {:.3}'.format(i+1, auc_))
 
+
+  if roc_curve_output:
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+
   
   file_ = open(writefolder+'/'+'report_nested_cross_validation_hyperparameter_tuning.txt', 'w')
   file_.write(s)
@@ -592,7 +614,10 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
     plt.savefig(writefolder+'/'+'nested_cross_validation_scores.png', dpi=100)
   
 
-  return best_params_all, best_auc_scores_holdout
+  if roc_curve_output:
+    return best_params_all, best_auc_scores_holdout, (mean_fpr, mean_tpr)
+  else:
+    return best_params_all, best_auc_scores_holdout
 
 
 
