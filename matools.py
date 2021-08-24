@@ -366,9 +366,9 @@ def get_model_ml_(params):
   elif params.split()[0] == 'rfc':
     if len(params.split()) != 4:
       if params.split()[1].lower()  == 'none':
-        clf = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_split=int(params.split()[2]))
+        clf = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_split=int(params.split()[2]), n_jobs=1)
       else:        
-        clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]), min_samples_split=int(params.split()[2]))
+        clf = RandomForestClassifier(n_estimators=100, max_depth=int(params.split()[1]), min_samples_split=int(params.split()[2]), n_jobs=1)
     else: # aqui eh pra entrar o n_est
       try:
         max_depth = int(params.split()[1])
@@ -384,7 +384,7 @@ def get_model_ml_(params):
       except:
         print ('Erro '+params)
         sys.exit(0)
-      clf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split)
+      clf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, min_samples_split=min_samples_split, n_jobs=1)
 
   elif params.split()[0] == 'logit':
     if params.split()[1].lower()  == 'none':
@@ -425,7 +425,7 @@ def f(params, X, Y, cv, resampling, seed):
 
 
 
-def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample', roc_curve_output=False)):
+def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample', roc_curve_output=False):
 
   n_classes = len(set(Y))
 
