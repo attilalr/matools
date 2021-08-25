@@ -256,7 +256,7 @@ def eliminate_records_nan(df, thr, reset_index=False):
 
 
 
-def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersampling', cv=3, multiclass=False, seed=None):
+def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersampling', cv=3, multiclass=False, seed=None, standardize=False, bootstrap=False):
 
   assert isinstance(seed, int)
 
@@ -278,44 +278,70 @@ def cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling='undersamplin
 
   for train, test in cv_folds.split(X, Y):
 
+    X_train = X[train].copy()
+
     # essa linha h soh pra setar caso o augmented seja None
     if resampling == None:
-      X_train_aug, Y_train_aug = X[train], Y[train]
+      X_train_aug, Y_train_aug = X_train, Y[train]
 
     # agora eh necessario checar o aumento de dados
     if resampling == 'smote':
-      X_train_aug, Y_train_aug = SMOTE().fit_resample(X[train], Y[train])
+      X_train_aug, Y_train_aug = SMOTE().fit_resample(X_train, Y[train])
 
     if resampling == 'undersampling':
       s = s + 'aug check: undersampling\n'
       rus = RandomUnderSampler()
-      X_train_aug, Y_train_aug = rus.fit_resample(X[train], Y[train])
+      X_train_aug, Y_train_aug = rus.fit_resample(X_train, Y[train])
 
     if resampling == 'oversampling':
       s = s + 'aug check: oversampling\n'
       ros = RandomOverSampler()
-      X_train_aug, Y_train_aug = ros.fit_resample(X[train], Y[train])
-    
+      X_train_aug, Y_train_aug = ros.fit_resample(X_train, Y[train])
+
+    if bootstrap:
+      #X_train_aug, Y_train_aug
+      # sorteia nrows indices com replacement
+      np.random.seed(seed)
+      idxs_rows_bootstrap = np.random.choice(np.arange(X_train_aug.shape[0]), size=X_train_aug.shape[0])
+      X_train_aug = X_train_aug[idxs_rows_bootstrap, :]
+      Y_train_aug = Y_train_aug[idxs_rows_bootstrap]
+
+    X_test = X[test].copy() # soh pra definir X_test quando std=False   
+    if standardize:
+      mean_ = X_train_aug.mean(axis=0)
+      std_ = X_train_aug.std(axis=0)
+      X_train_aug = ((X_train_aug-mean_)/std_).copy()
+      X_test = ((X[test]-mean_)/std_).copy()
+
+      # sometimes we have NaN when standardizing
+      idxs_rows_nans_X_train_aug = np.isnan(X_train_aug).sum(axis=1).astype('bool')
+      X_train_aug = X_train_aug[~idxs_rows_nans_X_train_aug, :]
+
+      #
+      idxs_rows_nans_X_test = np.isnan(X_test).sum(axis=1).astype('bool')
+      X_test = X_test[~idxs_rows_nans_X_test, :]
+
+
     # treino e predicoes
     clf.fit(X_train_aug, Y_train_aug)
-    Y_pred = clf.predict(X[test])
+    Y_pred = clf.predict(X_test)
     Y_true = Y[test]
 
     # guarda na matrizona geral
     if multiclass:
       roc_temporario_ = 0
       for i in range(1, n_classes+1):
-        Y_pred_proba_geral[test] = clf.predict_proba(X[test])[:, i-1] # pegar o proba 1 aqui 
+        Y_pred_proba_geral[test] = clf.predict_proba(X_test)[:, i-1] # pegar o proba 1 aqui 
         roc_temporario_ = roc_temporario_ + roc_auc_score((Y_true==i).astype('int'), Y_pred_proba_geral[test])
       roc_temporario_ = roc_temporario_ / n_classes
       scores_auc.append(roc_temporario_)
     else:
-      Y_pred_proba_geral[test] = clf.predict_proba(X[test])[:, 1] # pegar o proba 1 aqui 
+      Y_pred_proba_geral[test] = clf.predict_proba(X_test)[:, 1] # pegar o proba 1 aqui 
       scores_auc.append(roc_auc_score(Y_true, Y_pred_proba_geral[test]))
 
 
     #Y_pred_proba_geral[test] = clf.predict_proba(X[test])[:, 1].copy() # pegar o proba 1 aqui 
-    Y_pred_geral[test] = clf.predict(X[test]).copy()
+    Y_pred_geral[test] = clf.predict(X_test).copy()
 
 
     # guardando os scores
@@ -401,7 +427,7 @@ def get_model_ml_(params):
   return clf
 
 ### function to assist parallel implementation
-def f(params, X, Y, cv, resampling, seed):
+def f(params, X, Y, cv, resampling, seed, standardize, bootstrap):
 
   print ('rodando params: {}'.format(params))
 
@@ -414,7 +440,7 @@ def f(params, X, Y, cv, resampling, seed):
   else:
     print ('Erro! flag multiclass.')
 
-  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling=resampling, cv=cv, multiclass=multiclass, seed=seed)
+  return_ = cros_val(clf, X, Y, metrics=['accuracy', 'recall'], resampling=resampling, cv=cv, multiclass=multiclass, seed=seed, standardize=standardize, bootstrap=bootstrap)
 
   return return_.auc.mean()
 
@@ -425,11 +451,12 @@ def f(params, X, Y, cv, resampling, seed):
 
 
 
-def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample', roc_curve_output=False):
+def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampling='undersample', roc_curve_output=False, standardize=False, bootstrap=False):
 
   n_classes = len(set(Y))
 
   seed = int(time.time())
+  
 
   if roc_curve_output:
     mean_fpr = np.linspace(0, 1, 100)
@@ -475,9 +502,9 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   '''
   
   # SVC
-  C_list = np.logspace(np.log10(0.1), np.log10(1000), num=6)
+  C_list = np.logspace(np.log10(0.1), np.log10(1000), num=20)
   C_list = [str(x) for x in C_list]
-  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=6)
+  gamma_list = np.logspace(np.log10(0.0001), np.log10(1), num=20)
   gamma_list = [str(x) for x in gamma_list]
 
   svc_kernel = 'rbf'
@@ -494,7 +521,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   #rfc_params_list = ['rfc '+' '+x for x in max_depth_list]
 
   # Logit
-  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=10)
+  C_list = np.logspace(np.log10(0.0001), np.log10(10), num=50)
   C_list = [str(x) for x in C_list]
   logit_params_list = ['logit '+' '+x for x in C_list]
 
@@ -520,7 +547,7 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
   for i, (train, test) in enumerate(cv_folds.split(X, Y)):
 
 
-    parameters_vector_total = [(x, X[train], Y[train], cv, resampling, seed) for x in params_list]
+    parameters_vector_total = [(x, X[train].copy(), Y[train].copy(), cv, resampling, seed, standardize, bootstrap) for x in params_list]
 
     params_scores_partial = list()
     for parameters_vector in [parameters_vector_total[j:j+n_jobs] for j in range(0, len(parameters_vector_total), n_jobs)]:
@@ -550,10 +577,35 @@ def grid_search_nested_parallel(X, Y, cv=3, writefolder=None, n_jobs=30, resampl
     if resampling == 'oversampling':
       ros = RandomOverSampler()
       X_train_aug, Y_train_aug = ros.fit_resample(X[train], Y[train])
-    
+
+    if bootstrap:
+      # sorteia nrows indices com replacement
+      #np.random.seed(seed)
+      idxs_rows_bootstrap = np.random.choice(np.arange(X_train_aug.shape[0]), size=X_train_aug.shape[0])
+      X_train_aug = X_train_aug[idxs_rows_bootstrap, :]
+      Y_train_aug = Y_train_aug[idxs_rows_bootstrap]
+
+
+    X_test = X[test].copy() # soh pra definir X_test quando std=False   
+    if standardize:
+      mean_ = X_train_aug.mean(axis=0)
+      std_ = X_train_aug.std(axis=0)
+      X_train_aug = ((X_train_aug-mean_)/std_).copy()
+      X_test = ((X[test]-mean_)/std_).copy()
+
+      # sometimes we have NaN when standardizing
+      idxs_rows_nans_X_train_aug = np.isnan(X_train_aug).sum(axis=1).astype('bool')
+      X_train_aug = X_train_aug[~idxs_rows_nans_X_train_aug, :]
+
+      #
+      idxs_rows_nans_X_test = np.isnan(X_test).sum(axis=1).astype('bool')
+      X_test = X_test[~idxs_rows_nans_X_test, :]
+
+
+
     # treino e predicoes
     clf.fit(X_train_aug, Y_train_aug)
-    Y_pred = clf.predict(X[test])
+    Y_pred = clf.predict(X_test)
     #Y_true = Y[test]
     ##
     
